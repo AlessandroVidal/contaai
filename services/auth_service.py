@@ -1,30 +1,53 @@
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from models.user import User
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer
+from db import SessionLocal
+
+# ==============================
+# CONFIGURAÇÕES
+# ==============================
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-SECRET_KEY = "supersecretkey"
+SECRET_KEY = "supersecretkey"  # depois vamos mover isso para variável de ambiente
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
+
+# ==============================
+# PASSWORD
+# ==============================
 
 def hash_password(password: str):
     return pwd_context.hash(password)
+
 
 def verify_password(plain_password: str, hashed_password: str):
     return pwd_context.verify(plain_password, hashed_password)
 
 
+# ==============================
+# USUÁRIO
+# ==============================
 
 def get_user_by_email(db: Session, email: str):
     return db.query(User).filter(User.email == email).first()
 
+
 def create_user(db: Session, name: str, email: str, password: str):
+
+    # Verifica se já existe
+    existing_user = get_user_by_email(db, email)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email já cadastrado")
+
     hashed_password = hash_password(password)
     trial_end = datetime.utcnow() + timedelta(days=7)
 
@@ -36,20 +59,17 @@ def create_user(db: Session, name: str, email: str, password: str):
         trial_ends_at=trial_end
     )
 
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    try:
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Erro ao criar usuário")
 
     return user
 
 
-
-def check_user_plan(user: User):
-    if user.trial_ends_at:
-        if datetime.utcnow() > user.trial_ends_at:
-            user.plan = "FREE"
-    return user.plan
-
 def check_user_plan(user: User):
     if user.trial_ends_at:
         if datetime.utcnow() > user.trial_ends_at:
@@ -57,6 +77,9 @@ def check_user_plan(user: User):
     return user.plan
 
 
+# ==============================
+# TOKEN
+# ==============================
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -65,13 +88,9 @@ def create_access_token(data: dict):
 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-from fastapi import Depends
-from fastapi.security import OAuth2PasswordBearer
-from db import SessionLocal
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
