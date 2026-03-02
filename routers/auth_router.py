@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from db import SessionLocal
 from schemas.user import UserCreate, UserResponse
+from models.user import User
 from services.auth_service import (
     create_user,
     get_user_by_email,
     verify_password,
-    create_access_token
+    create_access_token,
+    get_current_user
 )
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -20,21 +22,16 @@ def get_db():
         db.close()
 
 
-
 @router.post("/register", response_model=UserResponse)
 def register(user: UserCreate, db: Session = Depends(get_db)):
-
     existing_user = get_user_by_email(db, user.email)
     if existing_user:
         raise HTTPException(status_code=400, detail="Email já cadastrado")
-
     return create_user(db, user.name, user.email, user.password)
-
 
 
 @router.post("/login")
 def login(user: UserCreate, db: Session = Depends(get_db)):
-
     db_user = get_user_by_email(db, user.email)
 
     if not db_user:
@@ -50,11 +47,14 @@ def login(user: UserCreate, db: Session = Depends(get_db)):
         "token_type": "bearer"
     }
 
-    @router.post("/upgrade")
+
+@router.post("/upgrade")
 def upgrade_plan(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user)
 ):
     current_user.plan = "PRO"
     db.commit()
+    db.refresh(current_user)
+
     return {"message": "Plano atualizado para PRO"}
