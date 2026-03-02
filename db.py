@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
-    raise ValueError("DATABASE_URL não encontrada nas variáveis de ambiente")
+    raise ValueError("DATABASE_URL não encontrado nas variáveis de ambiente")
 
 engine = create_engine(
     DATABASE_URL,
