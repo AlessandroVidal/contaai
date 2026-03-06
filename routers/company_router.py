@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+import re
 
 from db import SessionLocal
 from models.company import Company
@@ -9,8 +10,6 @@ from schemas.company import CompanyCreate, CompanyResponse
 
 from services.auth_service import get_current_user, check_user_plan
 from services.cnpj_service import get_cnpj_data
-
-import re
 
 
 router = APIRouter(prefix="/companies", tags=["Companies"])
@@ -24,7 +23,7 @@ def get_db():
         db.close()
 
 
-# CONSULT CNPJ
+# CONSULTAR CNPJ
 
 @router.get("/cnpj/{cnpj}")
 def consult_cnpj(
@@ -35,17 +34,12 @@ def consult_cnpj(
     cnpj = re.sub(r"\D", "", cnpj)
 
     if len(cnpj) != 14:
-        raise HTTPException(
-            status_code=400,
-            detail="CNPJ inválido"
-        )
+        raise HTTPException(status_code=400, detail="CNPJ inválido")
 
-    data = get_cnpj_data(cnpj)
-
-    return data
+    return get_cnpj_data(cnpj)
 
 
-# CREATE COMPANY
+# CREATE COMPANY AUTOMÁTICO
 
 @router.post("/", response_model=CompanyResponse)
 def create_company(
@@ -57,12 +51,9 @@ def create_company(
     cnpj = re.sub(r"\D", "", company.cnpj)
 
     if len(cnpj) != 14:
-        raise HTTPException(
-            status_code=400,
-            detail="CNPJ inválido"
-        )
+        raise HTTPException(status_code=400, detail="CNPJ inválido")
 
-    # evita duplicação de CNPJ
+    # evita duplicação
     existing_company = db.query(Company).filter(
         Company.cnpj == cnpj,
         Company.user_id == current_user.id
@@ -71,7 +62,7 @@ def create_company(
     if existing_company:
         raise HTTPException(
             status_code=400,
-            detail="Empresa com este CNPJ já existe"
+            detail="Empresa com este CNPJ já cadastrada"
         )
 
     # verifica plano
@@ -88,8 +79,13 @@ def create_company(
                 detail="Plano FREE permite apenas 1 empresa. Faça upgrade para PRO."
             )
 
+    # CONSULTA API CNPJ
+    cnpj_data = get_cnpj_data(cnpj)
+
+    name = cnpj_data["razao_social"]
+
     new_company = Company(
-        name=company.name,
+        name=name,
         cnpj=cnpj,
         user_id=current_user.id
     )
@@ -101,19 +97,20 @@ def create_company(
     return new_company
 
 
-# LIST COMPANIES
+# LISTAR EMPRESAS
 
 @router.get("/", response_model=list[CompanyResponse])
 def list_companies(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+
     return db.query(Company).filter(
         Company.user_id == current_user.id
     ).all()
 
 
-# GET COMPANY
+# BUSCAR EMPRESA
 
 @router.get("/{company_id}", response_model=CompanyResponse)
 def get_company(
@@ -128,15 +125,12 @@ def get_company(
     ).first()
 
     if not company:
-        raise HTTPException(
-            status_code=404,
-            detail="Empresa não encontrada"
-        )
+        raise HTTPException(status_code=404, detail="Empresa não encontrada")
 
     return company
 
 
-# DELETE COMPANY
+# DELETAR EMPRESA
 
 @router.delete("/{company_id}")
 def delete_company(
@@ -151,10 +145,7 @@ def delete_company(
     ).first()
 
     if not company:
-        raise HTTPException(
-            status_code=404,
-            detail="Empresa não encontrada"
-        )
+        raise HTTPException(status_code=404, detail="Empresa não encontrada")
 
     db.delete(company)
     db.commit()

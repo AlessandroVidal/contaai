@@ -2,7 +2,6 @@ from pydantic import BaseModel, field_validator
 
 
 class CompanyCreate(BaseModel):
-    name: str
     cnpj: str
 
     @field_validator("cnpj")
@@ -20,6 +19,7 @@ class CompanyResponse(BaseModel):
     id: int
     name: str
     cnpj: str
+    user_id: int
 
     class Config:
         from_attributes = True
