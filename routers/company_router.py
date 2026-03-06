@@ -82,12 +82,25 @@ def create_company(
     # CONSULTA API CNPJ
     cnpj_data = get_cnpj_data(cnpj)
 
-    name = cnpj_data["razao_social"]
-
     new_company = Company(
-        name=name,
+        user_id=current_user.id,
         cnpj=cnpj,
-        user_id=current_user.id
+
+        razao_social=cnpj_data["razao_social"],
+        nome_fantasia=cnpj_data["nome_fantasia"],
+
+        situacao=cnpj_data["situacao"],
+
+        logradouro=cnpj_data["logradouro"],
+        numero=cnpj_data["numero"],
+        bairro=cnpj_data["bairro"],
+
+        municipio=cnpj_data["municipio"],
+        uf=cnpj_data["uf"],
+        cep=cnpj_data["cep"],
+
+        atividade_principal=cnpj_data["atividade_principal"],
+        data_abertura=cnpj_data["data_abertura"],
     )
 
     db.add(new_company)

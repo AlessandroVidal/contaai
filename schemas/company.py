@@ -16,10 +16,26 @@ class CompanyCreate(BaseModel):
 
 
 class CompanyResponse(BaseModel):
+
     id: int
-    name: str
-    cnpj: str
     user_id: int
+
+    cnpj: str
+    razao_social: str
+    nome_fantasia: str
+
+    situacao: str
+
+    logradouro: str
+    numero: str
+    bairro: str
+
+    municipio: str
+    uf: str
+    cep: str
+
+    atividade_principal: str
+    data_abertura: str
 
     class Config:
         from_attributes = True
