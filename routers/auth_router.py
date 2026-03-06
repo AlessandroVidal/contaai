@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from fastapi.security import OAuth2PasswordRequestForm
 from db import SessionLocal
 from schemas.user import UserCreate, UserResponse
 from models.user import User
@@ -31,13 +32,16 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-def login(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = get_user_by_email(db, user.email)
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    db_user = get_user_by_email(db, form_data.username)
 
     if not db_user:
         raise HTTPException(status_code=400, detail="Email ou senha inválidos")
 
-    if not verify_password(user.password, db_user.password_hash):
+    if not verify_password(form_data.password, db_user.password_hash):
         raise HTTPException(status_code=400, detail="Email ou senha inválidos")
 
     access_token = create_access_token(data={"sub": db_user.email})
