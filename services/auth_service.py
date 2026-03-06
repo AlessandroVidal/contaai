@@ -11,15 +11,13 @@ from db import SessionLocal
 
 # CONFIGURAÇÕES
 
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-SECRET_KEY = "supersecretkey"  
+SECRET_KEY = "supersecretkey"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
-
 
 
 # PASSWORD
@@ -33,7 +31,6 @@ def verify_password(plain_password: str, hashed_password: str):
     return pwd_context.verify(plain_password, hashed_password)
 
 
-
 # USUÁRIO
 
 
@@ -43,7 +40,6 @@ def get_user_by_email(db: Session, email: str):
 
 def create_user(db: Session, name: str, email: str, password: str):
 
-   
     existing_user = get_user_by_email(db, email)
     if existing_user:
         raise HTTPException(status_code=400, detail="Email já cadastrado")
@@ -63,6 +59,7 @@ def create_user(db: Session, name: str, email: str, password: str):
         db.add(user)
         db.commit()
         db.refresh(user)
+
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=400, detail="Erro ao criar usuário")
@@ -70,12 +67,15 @@ def create_user(db: Session, name: str, email: str, password: str):
     return user
 
 
+# PLANO
+
+
 def check_user_plan(user: User):
     if user.trial_ends_at:
         if datetime.utcnow() > user.trial_ends_at:
             user.plan = "FREE"
-    return user.plan
 
+    return user.plan
 
 
 # TOKEN
@@ -83,16 +83,22 @@ def check_user_plan(user: User):
 
 def create_access_token(data: dict):
     to_encode = data.copy()
+
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
     to_encode.update({"exp": expire})
 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+# USUÁRIO 
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
         email: str = payload.get("sub")
 
         if email is None:
@@ -102,10 +108,14 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Token inválido")
 
     db = SessionLocal()
-    user = db.query(User).filter(User.email == email).first()
-    db.close()
 
-    if user is None:
-        raise HTTPException(status_code=401, detail="Usuário não encontrado")
+    try:
+        user = db.query(User).filter(User.email == email).first()
 
-    return user
+        if user is None:
+            raise HTTPException(status_code=401, detail="Usuário não encontrado")
+
+        return user
+
+    finally:
+        db.close()
