@@ -8,6 +8,9 @@ from models.user import User
 from schemas.company import CompanyCreate, CompanyResponse
 
 from services.auth_service import get_current_user, check_user_plan
+from services.cnpj_service import get_cnpj_data
+
+import re
 
 
 router = APIRouter(prefix="/companies", tags=["Companies"])
@@ -21,6 +24,27 @@ def get_db():
         db.close()
 
 
+# CONSULT CNPJ
+
+@router.get("/cnpj/{cnpj}")
+def consult_cnpj(
+    cnpj: str,
+    current_user: User = Depends(get_current_user)
+):
+
+    cnpj = re.sub(r"\D", "", cnpj)
+
+    if len(cnpj) != 14:
+        raise HTTPException(
+            status_code=400,
+            detail="CNPJ inválido"
+        )
+
+    data = get_cnpj_data(cnpj)
+
+    return data
+
+
 # CREATE COMPANY
 
 @router.post("/", response_model=CompanyResponse)
@@ -30,9 +54,17 @@ def create_company(
     current_user: User = Depends(get_current_user),
 ):
 
-    # verifica se já existe empresa com mesmo CNPJ para o usuário
+    cnpj = re.sub(r"\D", "", company.cnpj)
+
+    if len(cnpj) != 14:
+        raise HTTPException(
+            status_code=400,
+            detail="CNPJ inválido"
+        )
+
+    # evita duplicação de CNPJ
     existing_company = db.query(Company).filter(
-        Company.cnpj == company.cnpj,
+        Company.cnpj == cnpj,
         Company.user_id == current_user.id
     ).first()
 
@@ -42,7 +74,7 @@ def create_company(
             detail="Empresa com este CNPJ já existe"
         )
 
-    # verifica plano do usuário
+    # verifica plano
     plan = check_user_plan(current_user)
 
     if plan == "FREE":
@@ -58,7 +90,7 @@ def create_company(
 
     new_company = Company(
         name=company.name,
-        cnpj=company.cnpj,
+        cnpj=cnpj,
         user_id=current_user.id
     )
 
@@ -89,6 +121,7 @@ def get_company(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+
     company = db.query(Company).filter(
         Company.id == company_id,
         Company.user_id == current_user.id
@@ -111,6 +144,7 @@ def delete_company(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+
     company = db.query(Company).filter(
         Company.id == company_id,
         Company.user_id == current_user.id
