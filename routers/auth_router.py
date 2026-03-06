@@ -76,15 +76,16 @@ def login(
 
 # UPGRADE PLAN
 
+# UPGRADE PLAN
+
 @router.post("/upgrade")
 def upgrade_plan(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     current_user.plan = "PRO"
 
     db.commit()
-    db.refresh(current_user)
 
     return {
         "message": "Plano atualizado para PRO"
