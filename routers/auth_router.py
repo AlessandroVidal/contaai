@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
+
 from db import SessionLocal
 from schemas.user import UserCreate, UserResponse
 from models.user import User
+
 from services.auth_service import (
     create_user,
     get_user_by_email,
@@ -15,6 +17,7 @@ from services.auth_service import (
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
+# Dependency para pegar conexão com banco
 def get_db():
     db = SessionLocal()
     try:
@@ -23,13 +26,25 @@ def get_db():
         db.close()
 
 
+
+# REGISTER
+
 @router.post("/register", response_model=UserResponse)
 def register(user: UserCreate, db: Session = Depends(get_db)):
     existing_user = get_user_by_email(db, user.email)
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email já cadastrado")
-    return create_user(db, user.name, user.email, user.password)
 
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email já cadastrado"
+        )
+
+    new_user = create_user(db, user.name, user.email, user.password)
+
+    return new_user
+
+
+# LOGIN
 
 @router.post("/login")
 def login(
@@ -39,10 +54,16 @@ def login(
     db_user = get_user_by_email(db, form_data.username)
 
     if not db_user:
-        raise HTTPException(status_code=400, detail="Email ou senha inválidos")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email ou senha inválidos"
+        )
 
     if not verify_password(form_data.password, db_user.password_hash):
-        raise HTTPException(status_code=400, detail="Email ou senha inválidos")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email ou senha inválidos"
+        )
 
     access_token = create_access_token(data={"sub": db_user.email})
 
@@ -52,13 +73,19 @@ def login(
     }
 
 
+
+# UPGRADE PLAN
+
 @router.post("/upgrade")
 def upgrade_plan(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     current_user.plan = "PRO"
+
     db.commit()
     db.refresh(current_user)
 
-    return {"message": "Plano atualizado para PRO"}
+    return {
+        "message": "Plano atualizado para PRO"
+    }

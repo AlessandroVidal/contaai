@@ -8,22 +8,22 @@ from fastapi import HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
 from db import SessionLocal
 
-# ==============================
+
 # CONFIGURAÇÕES
-# ==============================
+
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-SECRET_KEY = "supersecretkey"  # depois vamos mover isso para variável de ambiente
+SECRET_KEY = "supersecretkey"  
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
-# ==============================
+
 # PASSWORD
-# ==============================
+
 
 def hash_password(password: str):
     return pwd_context.hash(password)
@@ -33,9 +33,9 @@ def verify_password(plain_password: str, hashed_password: str):
     return pwd_context.verify(plain_password, hashed_password)
 
 
-# ==============================
+
 # USUÁRIO
-# ==============================
+
 
 def get_user_by_email(db: Session, email: str):
     return db.query(User).filter(User.email == email).first()
@@ -43,7 +43,7 @@ def get_user_by_email(db: Session, email: str):
 
 def create_user(db: Session, name: str, email: str, password: str):
 
-    # Verifica se já existe
+   
     existing_user = get_user_by_email(db, email)
     if existing_user:
         raise HTTPException(status_code=400, detail="Email já cadastrado")
@@ -77,9 +77,9 @@ def check_user_plan(user: User):
     return user.plan
 
 
-# ==============================
+
 # TOKEN
-# ==============================
+
 
 def create_access_token(data: dict):
     to_encode = data.copy()
