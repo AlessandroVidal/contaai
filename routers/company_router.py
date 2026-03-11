@@ -40,7 +40,7 @@ def consult_cnpj(
     return get_cnpj_data(cnpj)
 
 
-# CREATE COMPANY AUTOMÁTICO
+# CRIAÇÃO COMPANY AUTOMÁTICO
 
 @router.post("/", response_model=CompanyResponse)
 def create_company(
