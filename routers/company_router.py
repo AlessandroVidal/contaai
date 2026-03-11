@@ -10,13 +10,13 @@ from schemas.company import CompanyCreate, CompanyResponse
 
 from services.auth_service import get_current_user, check_user_plan
 from services.cnpj_service import get_cnpj_data
-from services.tax_service import calculate_simples_tax
 from services.fiscal_service import calculate_company_tax
 
 
 router = APIRouter(prefix="/companies", tags=["Companies"])
 
 
+# DATABASE DEPENDENCY
 def get_db():
     db = SessionLocal()
     try:
@@ -26,7 +26,6 @@ def get_db():
 
 
 # CONSULTAR CNPJ
-
 @router.get("/cnpj/{cnpj}")
 def consult_cnpj(
     cnpj: str,
@@ -41,8 +40,7 @@ def consult_cnpj(
     return get_cnpj_data(cnpj)
 
 
-# CRIAÇÃO COMPANY AUTOMÁTICO
-
+# CRIAR EMPRESA
 @router.post("/", response_model=CompanyResponse)
 def create_company(
     company: CompanyCreate,
@@ -55,7 +53,7 @@ def create_company(
     if len(cnpj) != 14:
         raise HTTPException(status_code=400, detail="CNPJ inválido")
 
-    # evita duplicação
+    # evitar duplicação
     existing_company = db.query(Company).filter(
         Company.cnpj == cnpj,
         Company.user_id == current_user.id
@@ -67,10 +65,11 @@ def create_company(
             detail="Empresa com este CNPJ já cadastrada"
         )
 
-    # verifica plano
+    # verificar plano
     plan = check_user_plan(current_user)
 
     if plan == "FREE":
+
         total_companies = db.query(Company).filter(
             Company.user_id == current_user.id
         ).count()
@@ -81,7 +80,7 @@ def create_company(
                 detail="Plano FREE permite apenas 1 empresa. Faça upgrade para PRO."
             )
 
-    # CONSULTA API CNPJ
+    # consulta API CNPJ
     cnpj_data = get_cnpj_data(cnpj)
 
     new_company = Company(
@@ -113,20 +112,20 @@ def create_company(
 
 
 # LISTAR EMPRESAS
-
 @router.get("/", response_model=list[CompanyResponse])
 def list_companies(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
 
-    return db.query(Company).filter(
+    companies = db.query(Company).filter(
         Company.user_id == current_user.id
     ).all()
 
+    return companies
+
 
 # BUSCAR EMPRESA
-
 @router.get("/{company_id}", response_model=CompanyResponse)
 def get_company(
     company_id: int,
@@ -146,7 +145,6 @@ def get_company(
 
 
 # DELETAR EMPRESA
-
 @router.delete("/{company_id}")
 def delete_company(
     company_id: int,
@@ -167,26 +165,6 @@ def delete_company(
 
     return {"message": "Empresa deletada com sucesso"}
 
-@router.get("/{company_id}/tax/{revenue}")
-def calculate_tax(
-    company_id: int,
-    revenue: float,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    company = db.query(Company).filter(
-        Company.id == company_id,
-        Company.user_id == current_user.id
-    ).first()
-
-    if not company:
-        raise HTTPException(
-            status_code=404,
-            detail="Empresa não encontrada"
-        )
-
-    return calculate_simples_tax(revenue)
 
 @router.get("/{company_id}/tax")
 def get_company_tax(
@@ -203,6 +181,4 @@ def get_company_tax(
     if not company:
         raise HTTPException(status_code=404, detail="Empresa não encontrada")
 
-    tax = calculate_company_tax(db, company_id)
-
-    return tax
+    return calculate_company_tax(db, company_id)
