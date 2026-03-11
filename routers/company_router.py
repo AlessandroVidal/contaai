@@ -11,6 +11,7 @@ from schemas.company import CompanyCreate, CompanyResponse
 from services.auth_service import get_current_user, check_user_plan
 from services.cnpj_service import get_cnpj_data
 from services.tax_service import calculate_simples_tax
+from services.fiscal_service import calculate_company_tax
 
 
 router = APIRouter(prefix="/companies", tags=["Companies"])
@@ -186,3 +187,22 @@ def calculate_tax(
         )
 
     return calculate_simples_tax(revenue)
+
+@router.get("/{company_id}/tax")
+def get_company_tax(
+    company_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    company = db.query(Company).filter(
+        Company.id == company_id,
+        Company.user_id == current_user.id
+    ).first()
+
+    if not company:
+        raise HTTPException(status_code=404, detail="Empresa não encontrada")
+
+    tax = calculate_company_tax(db, company_id)
+
+    return tax
