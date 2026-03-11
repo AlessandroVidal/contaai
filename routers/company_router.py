@@ -10,6 +10,7 @@ from schemas.company import CompanyCreate, CompanyResponse
 
 from services.auth_service import get_current_user, check_user_plan
 from services.cnpj_service import get_cnpj_data
+from services.tax_service import calculate_simples_tax
 
 
 router = APIRouter(prefix="/companies", tags=["Companies"])
@@ -164,3 +165,24 @@ def delete_company(
     db.commit()
 
     return {"message": "Empresa deletada com sucesso"}
+
+@router.get("/{company_id}/tax/{revenue}")
+def calculate_tax(
+    company_id: int,
+    revenue: float,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    company = db.query(Company).filter(
+        Company.id == company_id,
+        Company.user_id == current_user.id
+    ).first()
+
+    if not company:
+        raise HTTPException(
+            status_code=404,
+            detail="Empresa não encontrada"
+        )
+
+    return calculate_simples_tax(revenue)
